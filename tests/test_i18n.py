@@ -95,7 +95,7 @@ def test_help_is_translated(capsys):
     assert "usage:" in en and "--write" in en and "사용법" not in en
 
 
-def test_json_and_sarif_messages_follow_language(capsys, example_project):
+def test_json_messages_follow_language(capsys, example_project):
     main([str(example_project), "--lang", "ko", "--format", "json", "--fail-on", "never"])
     data = json.loads(capsys.readouterr().out)
     assert data["lang"] == "ko" and re.search(r"[가-힣]", data["findings"][0]["message"])

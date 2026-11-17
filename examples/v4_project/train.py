@@ -38,7 +38,6 @@ args = TrainingArguments(
 
 trainer = HFTrainer(model=model, args=args, tokenizer=tok)
 trainer.train(model_path="out/checkpoint-100")
-model.save_pretrained("out/final", safe_serialization=False)
 
 summarizer = tf.pipeline("summarization", model="t5-small")
 generator = pipeline("text-generation", model="gpt2")

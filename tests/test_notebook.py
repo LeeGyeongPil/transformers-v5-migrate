@@ -74,17 +74,20 @@ def test_unparsable_cell_reported():
     assert "processing_class=tok" in "".join(new["cells"][1]["source"])
 
 
-def test_transformers_cli_and_env_magic_reported_with_cell_and_line():
+def test_shell_and_env_magics_are_neither_reported_nor_rewritten():
     raw = _dumps(_nb(("code", "%env TRANSFORMERS_CACHE=/c\n!transformers-cli env\n")))
     result = migrate_notebook(raw)
-    assert [(f.rule, f.cell, f.line) for f in result.findings] == [("TV5M08", 1, 1), ("TV5M10", 1, 2)]
-    assert result.code == raw  # report only, no rewrite
+    assert result.findings == [] and result.fixes == []
+    assert result.code == raw
 
 
-def test_cell_magic_is_scanned_as_text_not_parsed():
-    raw = _dumps(_nb(("code", "%%bash\ntransformers-cli login\n")))
+def test_cell_magic_is_skipped_not_parsed():
+    raw = _dumps(_nb(("code", "%%bash\ntransformers-cli login\n"), ("code", CODE_CELL)))
     result = migrate_notebook(raw)
-    assert [(f.rule, f.cell, f.line) for f in result.findings] == [("TV5M10", 1, 2)]
+    assert [f.rule for f in result.findings if f.rule == "TV5P01"] == []
+    new = json.loads(result.code)
+    assert new["cells"][0]["source"] == ["%%bash\n", "transformers-cli login\n"]
+    assert "processing_class=tok" in "".join(new["cells"][1]["source"])
 
 
 def test_nothing_to_fix_is_byte_identical():

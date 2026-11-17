@@ -1,4 +1,4 @@
-"""AC-6 and AC-10: output formats and exit codes."""
+"""AC-5 and AC-9: output formats and exit codes."""
 
 import json
 import re
@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-from transformers_v5_migrate import RULES
+from transformers_v5_migrate import RULES, __version__
 from transformers_v5_migrate.cli import main
 
 SUMMARY = re.compile(r"\d+ auto-fixable · \d+ manual · \d+ behavior · \d+ dependency")
@@ -33,26 +33,18 @@ def test_json_shape(capsys, example_project):
     assert {"rule", "path", "line", "col", "before", "after", "message"} <= set(data["fixes"][0])
 
 
-def test_sarif_shape(capsys, example_project, tmp_path):
-    out_file = tmp_path / "out.sarif"
-    code, out, err = run(capsys, str(example_project), "--format", "sarif", "--output", str(out_file))
-    assert code == 1 and out == "" and str(out_file) in err
-    sarif = json.loads(out_file.read_text(encoding="utf-8"))
-    assert sarif["version"] == "2.1.0"
-    driver = sarif["runs"][0]["tool"]["driver"]
-    declared = {r["id"] for r in driver["rules"]}
-    assert declared == set(RULES)
-    results = sarif["runs"][0]["results"]
-    assert results and {r["ruleId"] for r in results} <= declared
-    assert {r["level"] for r in results} <= {"error", "warning", "note"}
-    plain = [r for r in results if r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].endswith(".py")]
-    location = plain[0]["locations"][0]["physicalLocation"]
-    assert location["artifactLocation"]["uri"] and location["region"]["startLine"] >= 1
-    notebook = [r for r in results if r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].endswith(".ipynb")]
-    assert notebook and all("cell" in r["properties"] for r in notebook)
-    # cell lines are not notebook JSON lines: no region, the cell position is in the message
-    assert all("region" not in r["locations"][0]["physicalLocation"] for r in notebook)
-    assert all(r["message"]["text"].startswith(f"cell {r['properties']['cell']}:") for r in notebook)
+def test_format_choices(capsys, example_project):
+    for bad in ("sarif", "xml"):
+        with pytest.raises(SystemExit) as info:
+            main([str(example_project), "--format", bad])
+        assert info.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err
+
+
+def test_explain_option_is_gone(capsys, example_project):
+    with pytest.raises(SystemExit) as info:
+        main(["--explain", "TV5R01"])
+    assert info.value.code == 2
 
 
 def test_exit_codes(capsys, tmp_path, example_project):
@@ -88,16 +80,24 @@ def test_fixed_only_input_exits_zero_after_write(capsys, tmp_path):
 
 
 def test_fail_on_levels(capsys, tmp_path):
-    (tmp_path / "t.py").write_text("import transformers\nm = transformers.AutoModelForCausalLM.from_pretrained('x', dtype='auto')\ntok.batch_decode(i)\n")
+    (tmp_path / "t.py").write_text("import transformers\nm = transformers.AutoModelForCausalLM.from_pretrained('x')\n")
     assert run(capsys, str(tmp_path), "--fail-on", "error")[0] == 0  # only a note
     assert run(capsys, str(tmp_path), "--fail-on", "note")[0] == 1
 
 
-def test_select_ignore_and_validation(capsys, example_project):
-    code, out, _ = run(capsys, str(example_project), "--select", "TV5D", "--format", "json")
+def _vulnerable_project(tmp_path):
+    """A project with v4 pins, built here so that no pinned manifest is committed to the repository."""
+    (tmp_path / "requirements.txt").write_text("transformers==4.57.1\nhuggingface_hub<1.0\n")
+    (tmp_path / "train.py").write_text("from transformers import AutoModel\nAutoModel.from_pretrained('x', torch_dtype='auto')\n")
+    return tmp_path
+
+
+def test_select_ignore_and_validation(capsys, tmp_path, example_project):
+    project = str(_vulnerable_project(tmp_path))
+    code, out, _ = run(capsys, project, "--select", "TV5D", "--format", "json")
     assert {f["rule"] for f in json.loads(out)["findings"]} == {"TV5D01", "TV5D02"}
     assert json.loads(out)["fixes"] == []
-    code, out, _ = run(capsys, str(example_project), "--ignore", "TV5R,TV5M,TV5B,TV5P", "--format", "json")
+    code, out, _ = run(capsys, project, "--ignore", "TV5R,TV5M,TV5B,TV5P", "--format", "json")
     assert {f["rule"] for f in json.loads(out)["findings"]} == {"TV5D01", "TV5D02"}
     with pytest.raises(SystemExit) as info:
         main([str(example_project), "--select", "NOPE"])
@@ -105,9 +105,9 @@ def test_select_ignore_and_validation(capsys, example_project):
 
 
 def test_exclude_glob(capsys, example_project):
-    _, out, _ = run(capsys, str(example_project), "--exclude", "*.ipynb", "--exclude", "Dockerfile", "--format", "json")
+    _, out, _ = run(capsys, str(example_project), "--exclude", "*.ipynb", "--format", "json")
     paths = {f["path"] for f in json.loads(out)["findings"]}
-    assert not any(p.endswith((".ipynb", "Dockerfile")) for p in paths)
+    assert paths and not any(p.endswith(".ipynb") for p in paths)
 
 
 def test_text_report_has_diff_sections_and_summary_last(capsys, example_project):
@@ -146,11 +146,11 @@ def test_version(capsys):
     with pytest.raises(SystemExit) as info:
         main(["--version"])
     assert info.value.code == 0
-    assert "transformers-v5-migrate 0.1.1" in capsys.readouterr().out
+    assert f"transformers-v5-migrate {__version__}" in capsys.readouterr().out
 
 
 def test_first_run_command_prints_summary_and_exits_zero(example_project):
-    """AC-10: the documented start command, run as a real process, finishes fast."""
+    """AC-9: the documented start command, run as a real process, finishes fast."""
     proc = subprocess.run(
         [sys.executable, "-m", "transformers_v5_migrate", str(example_project), "--fail-on", "never"],
         capture_output=True, text=True, timeout=30, env={"PATH": "", "LANG": "C"},
@@ -160,7 +160,7 @@ def test_first_run_command_prints_summary_and_exits_zero(example_project):
 
 
 def test_only_unsupported_explicit_files_exit_zero(capsys, tmp_path):
-    """Q-1: pre-commit passes every staged file that matches its pattern, even kinds we skip."""
+    """An explicit file of a kind the tool does not read is a friendly no-op, not an error."""
     (tmp_path / "notes.txt").write_text("hello\n")
     (tmp_path / "package.json").write_text("{}\n")
     (tmp_path / "ruff.toml").write_text("x = 1\n")

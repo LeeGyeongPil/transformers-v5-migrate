@@ -30,8 +30,7 @@ def test_expected_rule_lines(fixtures):
 def test_expected_markers_cover_every_manual_and_behavior_rule(fixtures):
     text = (fixtures / "findings_v4.py").read_text(encoding="utf-8")
     rules = {rule for rule, _ in _expected(text)}
-    # TV5M10 (transformers-cli) only occurs in shell-like text, see test_deps_text.py
-    wanted = {f"TV5M{n:02d}" for n in range(1, 13) if n != 10} | {"TV5B01", "TV5B02", "TV5B03", "TV5B04"}
+    wanted = {f"TV5M{n:02d}" for n in range(1, 9)} | {"TV5B01", "TV5B02"}
     assert rules >= wanted
 
 

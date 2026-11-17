@@ -44,22 +44,13 @@ def test_rules_consistent_with_surface(surface):
     assert {"encode_plus", "batch_encode_plus"} <= removed_tok
     assert removed_tok - set(R.REMOVED_TOKENIZER_NAMES) - {"encode_plus", "batch_encode_plus"} == set()
 
-    # TV5R09 / TV5M11: removed top-level classes and their replacements
+    # TV5R09 / TV5M03: removed top-level classes and their replacements
     top = surface["top_level"]
     for old, new in R.CLASS_RENAMES.items():
         assert new in top["present_in_v5"], new
-    removed_extractors = {n for n in top["removed"] if n.endswith("FeatureExtractor")}
-    assert set(R.REMOVED_FEATURE_EXTRACTORS) <= removed_extractors
-    # removed without an *ImageProcessor twin: deliberately not in the rule (no replacement to suggest)
-    assert removed_extractors - set(R.REMOVED_FEATURE_EXTRACTORS) == set(R.REMOVED_NO_REPLACEMENT)
-    for name in R.REMOVED_FEATURE_EXTRACTORS:
-        assert name.replace("FeatureExtractor", "ImageProcessor") in top["present_in_v5"], name
-    # TV5R11: every removed *ImageProcessorFast name has a plain twin that exists in v5
-    fast = [n for n in top["removed"] if n.endswith("ImageProcessorFast")]
-    assert len(fast) > 50
-    for name in fast:
-        assert R.class_rename(name) == ("TV5R11", name.removesuffix("Fast")), name
-        assert name.removesuffix("Fast") in top["present_in_v5"], name
+    # TV5M03: removed without any replacement class
+    for name in R.REMOVED_NO_REPLACEMENT:
+        assert name in top["removed"], name
     assert "AutoModelWithLMHead" in top["removed"]
     assert any(n.startswith("TF") for n in top["removed"]) and any(n.startswith("Flax") for n in top["removed"])
     assert not any(n.startswith(("TF", "Flax")) for n in top["present_in_v5"])
@@ -72,7 +63,7 @@ def test_hub_requirement_and_chat_template_default_match_the_snapshot(surface):
 
 
 def test_every_rule_is_documented_and_verified():
-    assert len(RULES) == 34
+    assert len(RULES) == 22
     for rule_id, rule in RULES.items():
         assert rule.id == rule_id
         assert rule.verified_in == "5.23.0"
