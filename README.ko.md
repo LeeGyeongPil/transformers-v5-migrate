@@ -4,7 +4,7 @@
 
 Hugging Face Transformers v4 코드(스크립트·노트북·의존성 파일)를 v5 로 옮길 때 쓰는 명령줄 코드 변환기 겸 위험 보고서입니다. 이름만 바뀐 것(`torch_dtype`→`dtype`, `use_auth_token`→`token`, `Trainer(tokenizer=)`→`processing_class=` 등)은 대신 고쳐 주고, 나머지는 규칙 ID·파일·줄·고치는 법과 함께 목록으로 보여 줍니다. `--write` 를 주지 않으면 아무것도 바꾸지 않습니다.
 
-![v4 학습 스크립트에 대한 자동 수정 diff 미리보기](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.0/docs/images/01-preview.ko.png)
+![v4 학습 스크립트에 대한 자동 수정 diff 미리보기](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.1/docs/images/01-preview.ko.png)
 *v4 학습 스크립트를 미리보기로 돌린 화면: 자동으로 고칠 수 있는 항목과, `--write` 가 적용할 diff.*
 
 ## 이런 분께
@@ -42,7 +42,7 @@ transformers-v5-migrate path/to/your/project
 uv run transformers-v5-migrate examples/v4_project --lang ko --color never --no-diff
 ```
 
-출력(줄여서 실음. 전체는 자동 수정 13건·수동 15건·동작 변경 4건·의존성 4건):
+출력(줄여서 실음. 전체는 자동 수정 13건·수동 15건·동작 변경 4건·의존성 3건):
 
 ```text
 == 자동 수정 가능 (아무것도 바꾸지 않았습니다. 적용하려면 --write) ==
@@ -56,11 +56,11 @@ examples/v4_project/train.py:20:5: TV5M01 [오류] `load_in_8bit=` 는 더 이�
     고치는 법: `BitsAndBytesConfig` 를 만들어 `quantization_config=` 로 넘기세요.
 
 == 의존성 파일 ==
-examples/v4_project/requirements.txt:3:1: TV5D02 [경고] `huggingface_hub<1.0` 는 transformers 5.23.0 이 요구하는 `huggingface-hub>=1.31.0,<3.0` 와 함께 설치할 수 없습니다.
+examples/v4_project/constraints.txt:3:1: TV5D02 [경고] `huggingface_hub<1.0` 는 transformers 5.23.0 이 요구하는 `huggingface-hub>=1.31.0,<3.0` 와 함께 설치할 수 없습니다.
     고치는 법: huggingface-hub 고정을 `>=1.31.0,<3.0` 으로 푸세요.
 
 파일 9개 점검, 2개가 바뀔 예정
-자동 수정 가능 13 · 수동 15 · 동작 변경 4 · 의존성 4
+자동 수정 가능 13 · 수동 15 · 동작 변경 4 · 의존성 3
 ```
 
 읽는 법:
@@ -69,14 +69,14 @@ examples/v4_project/requirements.txt:3:1: TV5D02 [경고] `huggingface_hub<1.0` 
 - **자동 수정 가능**은 안전한 이름 바꾸기입니다. **수동**은 그대로 바꿔 쓸 대체가 없어 사람이 정해야 합니다. **동작 변경**은 v5 에서도 돌지만 결과가 달라집니다. **의존성**은 v5 를 막는 버전 고정입니다.
 - 오류 수준 항목이 남아 있으면 종료 코드 1, 아니면 0 입니다.
 
-![수동·동작 변경·의존성 항목과 고치는 법](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.0/docs/images/02-report.ko.png)
+![수동·동작 변경·의존성 항목과 고치는 법](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.1/docs/images/02-report.ko.png)
 *보고서 부분: 모든 항목에 규칙 ID·위치·심각도·고치는 법이 붙습니다.*
 
 ## 사용법
 
 | 명령·옵션 | 하는 일 | 예 |
 |---|---|---|
-| `PATH ...` | 점검할 파일·폴더(`.py`, `.ipynb`, `requirements*.txt`, `pyproject.toml`, `environment.yml`, Dockerfile, `.env*`, 셸 스크립트, Makefile, JSON/YAML 학습 설정) | `transformers-v5-migrate src/ notebooks/` |
+| `PATH ...` | 점검할 파일·폴더(`.py`, `.ipynb`, `requirements*.txt`, `constraints*.txt`, `pyproject.toml`, `environment.yml`, Dockerfile, `.env*`, 셸 스크립트, Makefile, JSON/YAML 학습 설정) | `transformers-v5-migrate src/ notebooks/` |
 | *(기본)* | 미리보기: 보고서와 diff 만 보여 주고 쓰지 않음 | `transformers-v5-migrate .` |
 | `--write` | 자동 수정을 `.py`·`.ipynb` 파일에만 적용 | `transformers-v5-migrate . --write` |
 | `--no-diff` | diff 미리보기를 숨김 | `transformers-v5-migrate . --no-diff` |
@@ -101,15 +101,15 @@ transformers-v5-migrate . --no-diff
 
 ```text
 파일 9개 점검, 2개 변경
-자동 수정 완료 13 · 수동 15 · 동작 변경 4 · 의존성 4
+자동 수정 완료 13 · 수동 15 · 동작 변경 4 · 의존성 3
 
 파일 9개 점검, 0개가 바뀔 예정
-자동 수정 가능 0 · 수동 15 · 동작 변경 4 · 의존성 4
+자동 수정 가능 0 · 수동 15 · 동작 변경 4 · 의존성 3
 ```
 
 두 번째 실행에는 자동으로 고칠 것이 더 없으므로 같은 명령을 다시 돌려도 결과가 같습니다(멱등). 수동·동작 변경·의존성 항목만 남습니다. 고칠 것 없는 파일은 건드리지 않고(바이트·수정 시각 그대로), CRLF 줄바꿈과 BOM 을 유지하며, 쓰기는 원자적으로 합니다.
 
-![--write 를 돌리고 다시 점검한 화면](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.0/docs/images/03-write.ko.png)
+![--write 를 돌리고 다시 점검한 화면](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.1/docs/images/03-write.ko.png)
 *`--write` 뒤 두 번째 실행은 바뀔 파일 0개입니다. 사람이 봐야 할 항목만 남습니다.*
 
 ### 노트북
@@ -123,7 +123,7 @@ SARIF 2.1.0 출력은 코드 스캐닝에 올릴 수 있습니다. pre-commit �
 ```yaml
 repos:
   - repo: https://github.com/LeeGyeongPil/transformers-v5-migrate
-    rev: v0.1.0
+    rev: v0.1.1
     hooks:
       - id: transformers-v5-migrate          # v5 에서 깨질 것이 있으면 실패
       # - id: transformers-v5-migrate-fix    # 또는 자동 수정 적용
@@ -161,7 +161,7 @@ TV5R06  warmup_ratio= 가 warmup_steps= 로 대체 ([0, 1) 범위 float)
   문서       https://github.com/huggingface/transformers/blob/main/MIGRATION_GUIDE_V5.md
 ```
 
-![규칙 TV5R06 의 explain 화면](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.0/docs/images/04-explain.ko.png)
+![규칙 TV5R06 의 explain 화면](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.1/docs/images/04-explain.ko.png)
 *`--explain` 은 규칙이 하는 일, 확인 정도, 전/후 예시를 보여 줍니다.*
 
 ## 설정

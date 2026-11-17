@@ -4,7 +4,7 @@
 
 A command-line codemod and risk report for moving Hugging Face Transformers v4 code (scripts, notebooks, dependency files) to v5. It rewrites the mechanical renames for you (`torch_dtype` to `dtype`, `use_auth_token` to `token`, `Trainer(tokenizer=)` to `processing_class=`, and more) and lists everything else with a rule ID, file, line and the fix. Nothing is changed unless you pass `--write`.
 
-![Diff preview of the automatic fixes on a v4 training script](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.0/docs/images/01-preview.png)
+![Diff preview of the automatic fixes on a v4 training script](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.1/docs/images/01-preview.png)
 *A dry run on a v4 training script: the findings that can be fixed automatically, then the diff that `--write` would apply.*
 
 ## Who it is for
@@ -42,7 +42,7 @@ From a clone you can try the bundled v4 sample project (use `uv run transformers
 uv run transformers-v5-migrate examples/v4_project --lang en --color never --no-diff
 ```
 
-Output (shortened; the full run lists 13 fixes, 15 manual items, 4 behavior notes and 4 dependency notes):
+Output (shortened; the full run lists 13 fixes, 15 manual items, 4 behavior notes and 3 dependency notes):
 
 ```text
 == Auto-fixable (nothing was changed; add --write to apply) ==
@@ -56,11 +56,11 @@ examples/v4_project/train.py:20:5: TV5M01 [error] `load_in_8bit=` is no longer a
     fix: Build a `BitsAndBytesConfig` and pass it as `quantization_config=`.
 
 == Dependency files ==
-examples/v4_project/requirements.txt:3:1: TV5D02 [warning] `huggingface_hub<1.0` cannot be installed together with transformers 5.23.0, which needs `huggingface-hub>=1.31.0,<3.0`.
+examples/v4_project/constraints.txt:3:1: TV5D02 [warning] `huggingface_hub<1.0` cannot be installed together with transformers 5.23.0, which needs `huggingface-hub>=1.31.0,<3.0`.
     fix: Relax the huggingface-hub pin to `>=1.31.0,<3.0`.
 
 9 files checked, 2 would change
-13 auto-fixable · 15 manual · 4 behavior · 4 dependency
+13 auto-fixable · 15 manual · 4 behavior · 3 dependency
 ```
 
 How to read it:
@@ -69,14 +69,14 @@ How to read it:
 - **Auto-fixable** items are safe renames. **Manual** items have no drop-in replacement, so you decide. **Behavior** items still run on v5 but give different results. **Dependency** items are version pins that exclude v5.
 - The exit code is 1 when an error-level item is open, 0 otherwise.
 
-![The manual, behavior and dependency findings with their fixes](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.0/docs/images/02-report.png)
+![The manual, behavior and dependency findings with their fixes](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.1/docs/images/02-report.png)
 *The report part of the output: every item carries a rule ID, location, severity and the way to fix it.*
 
 ## Usage
 
 | Command / option | What it does | Example |
 |---|---|---|
-| `PATH ...` | Files or folders to check (`.py`, `.ipynb`, `requirements*.txt`, `pyproject.toml`, `environment.yml`, Dockerfiles, `.env*`, shell scripts, Makefiles, JSON/YAML training configs) | `transformers-v5-migrate src/ notebooks/` |
+| `PATH ...` | Files or folders to check (`.py`, `.ipynb`, `requirements*.txt`, `constraints*.txt`, `pyproject.toml`, `environment.yml`, Dockerfiles, `.env*`, shell scripts, Makefiles, JSON/YAML training configs) | `transformers-v5-migrate src/ notebooks/` |
 | *(default)* | Dry run: report plus diff, nothing is written | `transformers-v5-migrate .` |
 | `--write` | Apply the automatic fixes to `.py` and `.ipynb` files only | `transformers-v5-migrate . --write` |
 | `--no-diff` | Hide the diff preview | `transformers-v5-migrate . --no-diff` |
@@ -101,15 +101,15 @@ On the sample project (copied to a temporary folder) the two runs end like this:
 
 ```text
 9 files checked, 2 changed
-13 auto-fixed · 15 manual · 4 behavior · 4 dependency
+13 auto-fixed · 15 manual · 4 behavior · 3 dependency
 
 9 files checked, 0 would change
-0 auto-fixable · 15 manual · 4 behavior · 4 dependency
+0 auto-fixable · 15 manual · 4 behavior · 3 dependency
 ```
 
 The second run finds nothing left to fix automatically, so the command is idempotent. Only the manual, behavior and dependency items remain. Files with nothing to fix are not touched (bytes and modification time stay the same), CRLF line endings and BOMs are kept, and writes are atomic.
 
-![Running --write and then checking again](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.0/docs/images/03-write.png)
+![Running --write and then checking again](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.1/docs/images/03-write.png)
 *After `--write` the second run reports 0 would change; only items that need a human remain.*
 
 ### Notebooks
@@ -123,7 +123,7 @@ SARIF 2.1.0 output can be uploaded to code scanning. For pre-commit, add to `.pr
 ```yaml
 repos:
   - repo: https://github.com/LeeGyeongPil/transformers-v5-migrate
-    rev: v0.1.0
+    rev: v0.1.1
     hooks:
       - id: transformers-v5-migrate          # fail when something would break on v5
       # - id: transformers-v5-migrate-fix    # or: apply the automatic fixes
@@ -161,7 +161,7 @@ TV5R06  warmup_ratio= replaced by warmup_steps= (float in [0, 1))
   docs             https://github.com/huggingface/transformers/blob/main/MIGRATION_GUIDE_V5.md
 ```
 
-![The explain view for rule TV5R06](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.0/docs/images/04-explain.png)
+![The explain view for rule TV5R06](https://raw.githubusercontent.com/LeeGyeongPil/transformers-v5-migrate/v0.1.1/docs/images/04-explain.png)
 *`--explain` shows what a rule does, how sure we are, and a before/after pair.*
 
 ## Configuration
