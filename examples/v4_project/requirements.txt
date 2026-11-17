@@ -1,5 +1,5 @@
 # Pinned for v4: this is what the dependency check looks at.
-transformers==4.57.1
+transformers==5.10.1
 huggingface_hub<1.0
 torch>=2.2
 datasets
