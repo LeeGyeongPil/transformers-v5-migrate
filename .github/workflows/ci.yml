@@ -1,0 +1,26 @@
+# Offline unit tests on every push, plus a job that proves the fixes against a real transformers 5.23.0.
+name: ci
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"   # weekly: dependencies and runtimes change under us
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv python install
+      - run: uv sync --locked
+      - run: uv run pytest -q
+  integration:
+    # Installs transformers 5.23.0 (no torch needed) and checks that original code fails and migrated code works.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv python install
+      - run: uv sync --locked
+      - run: uv run --with "transformers==5.23.0" pytest -q -m integration tests/integration
