@@ -1,0 +1,7 @@
+{
+  "output_dir": "out",
+  "per_gpu_train_batch_size": 8,
+  "warmup_ratio": 0.1,
+  "logging_dir": "runs",
+  "learning_rate": 5e-5
+}
