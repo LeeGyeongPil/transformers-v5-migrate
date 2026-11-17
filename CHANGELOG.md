@@ -4,7 +4,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-11-17
+
+### Security
+
+- Sample project: renamed `examples/v4_project/requirements.txt` to `constraints.txt` and raised the
+  `transformers` floor in its `pyproject.toml` to `>=5.23.0`, so the sample is not meant to be
+  picked up as a real dependency manifest (whether the related Dependabot alerts close is only visible after GitHub
+  re-indexes the repository). The dependency checks still run on `constraints.txt`; the sample now reports 3
+  dependency notes.
 
 ## [0.1.0] - 2026-11-17
 
@@ -30,5 +38,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scripts/refresh_surface.py` (`--check` for a scheduled comparison against the newest 5.x).
 - pre-commit hooks (`.pre-commit-hooks.yaml`) and a weekly `surface-watch` workflow.
 
-[Unreleased]: https://github.com/LeeGyeongPil/transformers-v5-migrate/compare/v0.1.0...HEAD
+[0.1.1]: https://github.com/LeeGyeongPil/transformers-v5-migrate/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/LeeGyeongPil/transformers-v5-migrate/releases/tag/v0.1.0

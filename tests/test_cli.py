@@ -146,7 +146,7 @@ def test_version(capsys):
     with pytest.raises(SystemExit) as info:
         main(["--version"])
     assert info.value.code == 0
-    assert "transformers-v5-migrate 0.1.0" in capsys.readouterr().out
+    assert "transformers-v5-migrate 0.1.1" in capsys.readouterr().out
 
 
 def test_first_run_command_prints_summary_and_exits_zero(example_project):
