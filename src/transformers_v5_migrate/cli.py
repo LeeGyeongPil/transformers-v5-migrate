@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from . import __version__
 from . import rules as R
 from .i18n import SUPPORTED, resolve_lang, t
-from .report import render_explain, render_json, render_rules, render_sarif, render_text
+from .report import render_json, render_rules, render_text
 from .scan import scan_paths
 from .walker import PathError
 
@@ -68,7 +68,7 @@ def build_parser(lang: str) -> argparse.ArgumentParser:
     parser.add_argument("-h", "--help", action="help", help=t("help.help", lang))
     parser.add_argument("paths", nargs="*", metavar="PATH", help=t("help.paths", lang))
     parser.add_argument("--write", action="store_true", help=t("help.write", lang))
-    parser.add_argument("--format", choices=("text", "json", "sarif"), default="text", help=t("help.format", lang))
+    parser.add_argument("--format", choices=("text", "json"), default="text", help=t("help.format", lang))
     parser.add_argument("--output", metavar="FILE", help=t("help.output", lang))
     parser.add_argument("--no-diff", action="store_true", help=t("help.no_diff", lang))
     parser.add_argument("--color", choices=("auto", "always", "never"), default="auto", help=t("help.color", lang))
@@ -79,7 +79,6 @@ def build_parser(lang: str) -> argparse.ArgumentParser:
     )
     parser.add_argument("--exclude", action="append", default=[], metavar="GLOB", help=t("help.exclude", lang))
     parser.add_argument("--list-rules", action="store_true", help=t("help.list_rules", lang))
-    parser.add_argument("--explain", metavar="RULE", help=t("help.explain", lang))
     parser.add_argument("--lang", choices=SUPPORTED, help=t("help.lang", lang))
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}", help=t("help.version", lang))
     return parser
@@ -112,12 +111,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.list_rules:
         sys.stdout.write(render_rules(lang))
         return 0
-    if args.explain:
-        rule_id = args.explain.strip().upper()
-        if rule_id not in R.RULES:
-            parser.error(t("err.bad_rule", lang, rule=args.explain))
-        sys.stdout.write(render_explain(rule_id, lang))
-        return 0
     if not args.paths:
         parser.error(t("err.no_paths", lang))
     select, ignore = _split(args.select), _split(args.ignore)
@@ -133,7 +126,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write(f"{parser.prog}: {t('cli.error', lang)}: {t('err.io', lang, path=exc.filename or '', error=exc.strerror)}\n")
         return 2
     if report.files_scanned == 0 and all(os.path.isfile(p) for p in args.paths):
-        # hooks pass every staged file that matches their pattern, including kinds we do not read
+        # an explicit file of a kind we do not read: say so instead of failing
         sys.stderr.write(f"{parser.prog}: {t('note.no_targets', lang)}\n")
         return 0
     if report.files_scanned == 0:
@@ -142,8 +135,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.format == "json":
         text = render_json(report, lang)
-    elif args.format == "sarif":
-        text = render_sarif(report, lang)
     else:
         color = args.color == "always" or (
             args.color == "auto" and not args.output and sys.stdout.isatty() and "NO_COLOR" not in os.environ

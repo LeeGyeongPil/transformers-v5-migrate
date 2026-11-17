@@ -8,11 +8,9 @@ from collections.abc import Iterable
 
 from . import rules as R
 from .codemod import migrate_source
-from .configscan import MAX_BYTES, scan_config
-from .deps import scan_environment, scan_pyproject, scan_requirements
+from .deps import scan_pyproject, scan_requirements
 from .model import FileDiff, Finding, ParseError, Report
 from .notebook import migrate_notebook
-from .textscan import scan_text
 from .walker import collect
 
 _BOM = "﻿"
@@ -41,15 +39,7 @@ def _scan_read_only(kind: str, text: str, path: str, sel: tuple[str, ...] | None
     """Kinds that are only ever reported on, never rewritten."""
     if kind == "requirements":
         return scan_requirements(text, path, sel, ign)
-    if kind == "pyproject":
-        return scan_pyproject(text, path, sel, ign)
-    if kind == "environment":
-        return scan_environment(text, path, sel, ign) + scan_text(text, path, sel, ign)
-    if kind == "yaml":
-        return scan_config(text, path, kind, sel, ign) + scan_text(text, path, sel, ign)
-    if kind == "config":
-        return scan_config(text, path, kind, sel, ign)
-    return scan_text(text, path, sel, ign)
+    return scan_pyproject(text, path, sel, ign)
 
 
 def scan_paths(
@@ -70,8 +60,6 @@ def scan_paths(
     ign = tuple(ignore) if ignore else None
     report = Report(written=write)
     for path, kind in collect(paths, exclude):
-        if kind == "config" and os.path.getsize(path) > MAX_BYTES:
-            continue  # a data dump, not a training config
         report.files_scanned += 1
         with open(path, "rb") as handle:
             raw = handle.read()

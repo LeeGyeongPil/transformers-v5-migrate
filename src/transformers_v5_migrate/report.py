@@ -1,4 +1,4 @@
-"""Render a :class:`Report` as text, JSON or SARIF 2.1.0 (and the rule table)."""
+"""Render a :class:`Report` as text or JSON (and the rule table)."""
 
 from __future__ import annotations
 
@@ -12,9 +12,6 @@ from . import __version__
 from . import rules as R
 from .i18n import t
 from .model import Finding, Fix, Report
-
-INFORMATION_URI = "https://github.com/LeeGyeongPil/transformers-v5-migrate"
-SARIF_SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
 
 _ANSI = {"bold": "1", "red": "31", "green": "32", "yellow": "33", "blue": "34", "cyan": "36", "dim": "2"}
 _SEVERITY_COLOR = {"error": "red", "warning": "yellow", "note": "blue"}
@@ -125,63 +122,6 @@ def render_json(report: Report, lang: str) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
 
-def _sarif_result(rule: str, level: str, text: str, path: str, line: int, col: int, cell: int | None, fixable: bool, lang: str = "en") -> dict[str, Any]:
-    props: dict[str, Any] = {"fixable": fixable}
-    physical: dict[str, Any] = {"artifactLocation": {"uri": path.replace("\\", "/")}}
-    if cell is None:
-        physical["region"] = {"startLine": line, "startColumn": col}
-    else:
-        # line and column count inside the cell, not in the notebook JSON: no region, say it in the message
-        props["cell"] = cell
-        props["line_in_cell"] = line
-        text = f"{t('label.cell', lang, cell=cell)}:{line}:{col}: {text}"
-    return {
-        "ruleId": rule,
-        "level": level,
-        "message": {"text": text},
-        "locations": [{"physicalLocation": physical}],
-        "properties": props,
-    }
-
-
-def render_sarif(report: Report, lang: str) -> str:
-    rules = [
-        {
-            "id": rule.id,
-            "shortDescription": {"text": t(f"title.{rule.id}", lang)},
-            "helpUri": rule.doc_url,
-            "defaultConfiguration": {"level": rule.severity},
-            "properties": {"kind": rule.kind, "verified_in": rule.verified_in, "source": rule.source},
-        }
-        for rule in R.RULES.values()
-    ]
-    results = []
-    if not report.written:  # fixes that were applied are not open problems any more
-        for fix in report.fixes:
-            text = f"{t('msg.' + fix.rule, lang)} ({fix.before} -> {fix.after})"
-            results.append(_sarif_result(fix.rule, R.RULES[fix.rule].severity, text, fix.path, fix.line, fix.col, fix.cell, True, lang))
-    for f in report.findings:
-        results.append(_sarif_result(f.rule, f.severity, render_message(f, lang), f.path, f.line, f.col, f.cell, f.fixable, lang))
-    sarif = {
-        "$schema": SARIF_SCHEMA,
-        "version": "2.1.0",
-        "runs": [
-            {
-                "tool": {
-                    "driver": {
-                        "name": "transformers-v5-migrate",
-                        "version": __version__,
-                        "informationUri": INFORMATION_URI,
-                        "rules": rules,
-                    }
-                },
-                "results": results,
-            }
-        ],
-    }
-    return json.dumps(sarif, indent=2, ensure_ascii=False) + "\n"
-
-
 def render_rules(lang: str) -> str:
     headers = [t(f"list.col.{c}", lang) for c in ("id", "kind", "severity", "verified", "source", "title")]
     rows = [
@@ -195,37 +135,6 @@ def render_rules(lang: str) -> str:
         return "  ".join(cells + [row[5]])
 
     return "\n".join([t("list.title", lang, version=R.TARGET_VERSION), "", line(headers), *(line(r) for r in rows)]) + "\n"
-
-
-class _Placeholders(dict):
-    """``str.format`` mapping that turns ``{name}`` into ``<name>`` (for --explain)."""
-
-    def __missing__(self, key: str) -> str:
-        return f"<{key}>"
-
-
-def render_explain(rule_id: str, lang: str) -> str:
-    """Everything the tool knows about one rule; ``rule_id`` must be an exact rule id."""
-    rule = R.RULES[rule_id]
-    placeholders = _Placeholders()
-    message = t(f"msg.{rule_id}", lang).format_map(placeholders)
-    rows = [
-        ("explain.kind", t(f"kind.{rule.kind}", lang)),
-        ("explain.severity", t(f"severity.{rule.severity}", lang)),
-        ("explain.verified", rule.verified_in),
-        ("explain.source", t(f"source.{rule.source}", lang)),
-        ("explain.message", message),
-        ("explain.fix", t(f"fix.{rule_id}", lang)),
-    ]
-    if rule_id in R.EXAMPLES:
-        before, after = R.EXAMPLES[rule_id]
-        rows += [("explain.before", before), ("explain.after", after)]
-    rows.append(("explain.docs", rule.doc_url))
-    labels = [(t(key, lang), value) for key, value in rows]
-    pad = max(_width(label) for label, _ in labels)
-    lines = [f"{rule_id}  {t(f'title.{rule_id}', lang)}"]
-    lines += [f"  {label}{' ' * (pad - _width(label))}  {value}" for label, value in labels]
-    return "\n".join(lines) + "\n"
 
 
 def _width(text: str) -> int:

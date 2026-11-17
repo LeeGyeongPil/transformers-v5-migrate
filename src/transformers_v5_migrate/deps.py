@@ -79,27 +79,6 @@ def scan_requirements(text: str, path: str, select: tuple[str, ...] | None, igno
     return findings
 
 
-_CONDA_ITEM = re.compile(r"^\s*-\s+(?:[\w.-]+::)?([A-Za-z0-9_.-]+)(?:\[[\w,]+\])?\s*([<>=!~][^#]*)?(?:#.*)?$")
-
-
-def scan_environment(text: str, path: str, select: tuple[str, ...] | None, ignore: tuple[str, ...] | None) -> list[Finding]:
-    """conda ``environment.yml``: both conda-style (``transformers=4.57``) and ``pip:`` entries."""
-    findings: list[Finding] = []
-    for number, raw in enumerate(text.split("\n"), start=1):
-        match = _CONDA_ITEM.match(raw)
-        if not match or canonicalize_name(match.group(1)) not in ("transformers", "huggingface-hub"):
-            continue
-        spec = (match.group(2) or "").strip()
-        if re.match(r"=[^=]", spec):  # conda: "=4.57" means 4.57.*, "=4.57.1=build" has a build string
-            version = spec[1:].split("=")[0].strip()
-            spec = f"=={version}.*" if re.fullmatch(r"\d+(\.\d+)*", version) else ""
-        col = raw.find(match.group(1)) + 1
-        for f in _check(match.group(1), spec.replace(" ", ""), path, number, col):
-            if R.is_enabled(f.rule, select, ignore):
-                findings.append(f)
-    return findings
-
-
 def _poetry_to_pep440(spec: str) -> str | None:
     """Translate the common Poetry constraint forms; return None when unsure."""
     spec = spec.strip()

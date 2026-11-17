@@ -24,7 +24,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import libcst as cst
-import libcst.matchers as m
 from libcst.metadata import MetadataWrapper, PositionProvider, QualifiedNameProvider, QualifiedNameSource
 
 from . import rules as R
@@ -33,10 +32,7 @@ from .model import Finding, Fix, ParseError, Result
 _RENDER = cst.Module([])
 _TF_OR_FLAX = re.compile(r"^(TF|Flax)[A-Z]")
 _MODEL_CLASS = re.compile(r"AutoModel\w*|\w+For\w+|\w+Model")
-_NON_MODEL_RECEIVER = re.compile(r"token|processor|config|extractor|(^|[._])tok($|[._])")
 _ENV_CALLS = {"os.getenv", "os.putenv", "os.environ.get", "os.environ.setdefault"}
-_IS_HUB_CALL = m.MatchIfTrue(lambda value: value in R.HUB_CALLS)
-_HUB_CALL = m.Call(func=m.Attribute(attr=m.Name(_IS_HUB_CALL))) | m.Call(func=m.Name(_IS_HUB_CALL))
 
 
 def _code(node: cst.CSTNode) -> str:
@@ -228,22 +224,14 @@ class _V5(cst.CSTTransformer):
                 self._include_inputs(i, arg, new_args, existing, dropped)
             elif kind == "args" and kw in R.ARGS_REMOVED:
                 self._find("TV5M06", arg, name=kw, hint=R.ARGS_REMOVED[kw])
-            elif attr == "from_pretrained" and kw == "additional_special_tokens":
-                rename(i, "TV5R10", "extra_special_tokens")
-            elif attr == "from_pretrained" and kw == "use_fast":
-                self._use_fast(i, arg, qn, new_args, existing)
             elif attr == "from_pretrained" and kw in ("load_in_8bit", "load_in_4bit"):
                 self._find("TV5M01", arg, name=kw)
             elif attr == "from_pretrained" and kw in ("from_tf", "from_flax"):
                 self._find("TV5M02", arg, name=kw)
-            elif attr in ("save_pretrained", "push_to_hub") and kw == "safe_serialization":
-                self._find("TV5M09", arg)
             elif is_pipeline and kw == "task":
                 task = _str_value(arg.value)
                 if task in R.REMOVED_PIPELINE_TASKS:
                     self._find("TV5M05", arg, task=task)
-            elif _is_name(func, "dict") and kw in R.OLD_ARGUMENT_NAMES and self.facts.has_import:
-                self._find("TV5M12", arg, name=kw)
 
         if is_pipeline and original_node.args and original_node.args[0].keyword is None:
             task = _str_value(original_node.args[0].value)
@@ -268,26 +256,6 @@ class _V5(cst.CSTTransformer):
             self._fix("TV5R08", func.attr, _code(func), _code(func.value))  # type: ignore[union-attr]
             result = result.with_changes(func=updated_node.func.value)
         return result
-
-    def _use_fast(self, i: int, arg: cst.Arg, qn: list[Any], new_args: list[cst.Arg], existing: set[str]) -> None:
-        """``use_fast=`` means ``backend=`` for image processors; tokenizers simply ignore it in v5."""
-        owners = {
-            q.name.split(".")[-2]
-            for q in qn
-            if q.name.startswith("transformers.") and q.name.endswith(".from_pretrained") and q.name.count(".") >= 2
-        }
-        if any("ImageProcessor" in owner for owner in owners):
-            if not self._on("TV5R12"):
-                return
-            value = arg.value
-            if "backend" in existing or not (_is_name(value, "True") or _is_name(value, "False")):
-                self._find("TV5R12", arg, "msg.TV5R12.manual")
-                return
-            backend = "torchvision" if _is_name(value, "True") else "pil"
-            new_args[i] = new_args[i].with_changes(keyword=cst.Name("backend"), value=cst.SimpleString(f'"{backend}"'))
-            self._fix("TV5R12", arg, f"use_fast={_code(value)}", f'backend="{backend}"')
-        elif any("Tokenizer" in owner for owner in owners):
-            self._find("TV5B05", arg)
 
     def _warmup_ratio(self, i: int, arg: cst.Arg, new_args: list[cst.Arg], existing: set[str]) -> None:
         if not self._on("TV5R06"):
@@ -335,12 +303,6 @@ class _V5(cst.CSTTransformer):
             tokenize = next((a.value for a in call.args if a.keyword and a.keyword.value == "tokenize"), None)
             if tokenize is None or not _is_name(tokenize, "False"):
                 self._find("TV5B02", anchor)
-        elif attr == "batch_decode":
-            self._find("TV5B03", anchor)
-        elif attr == "save_pretrained" and not star_kwargs and "max_shard_size" not in existing:
-            receiver = (_dotted(call.func.value) or "").lower()  # type: ignore[union-attr]
-            if not _NON_MODEL_RECEIVER.search(receiver):
-                self._find("TV5B04", anchor)
 
     # ---- attributes, names, imports, strings -------------------------------------
     def visit_Attribute(self, node: cst.Attribute) -> None:
@@ -371,18 +333,6 @@ class _V5(cst.CSTTransformer):
                 return updated_node.with_changes(value=renamed[1])
         return updated_node
 
-    def leave_Try(self, original_node: cst.Try, updated_node: cst.Try) -> cst.BaseStatement:
-        """TV5M13: ``except requests.HTTPError`` around Hub calls no longer catches Hub errors."""
-        if self._on("TV5M13") and m.findall(original_node.body, _HUB_CALL):
-            for handler in original_node.handlers:
-                if handler.type is None:
-                    continue
-                caught = [e.value for e in handler.type.elements] if isinstance(handler.type, cst.Tuple) else [handler.type]
-                for expr in caught:
-                    if any(q.name in R.REQUESTS_ERRORS for q in self._qn(expr)):
-                        self._find("TV5M13", expr)
-        return updated_node
-
     def leave_ImportFrom(self, original_node: cst.ImportFrom, updated_node: cst.ImportFrom) -> cst.BaseSmallStatement:
         module = _dotted(original_node.module) or ""
         if original_node.relative or (module != "transformers" and not module.startswith("transformers.")):
@@ -404,8 +354,6 @@ class _V5(cst.CSTTransformer):
             self._find("TV5M04", anchor)
         elif _TF_OR_FLAX.match(name) or name in R.REMOVED_NO_REPLACEMENT:
             self._find("TV5M03", anchor, name=name)
-        elif name in R.REMOVED_FEATURE_EXTRACTORS:
-            self._find("TV5M11", anchor, name=name, new=name.replace("FeatureExtractor", "ImageProcessor"))
 
     def leave_Subscript(self, original_node: cst.Subscript, updated_node: cst.Subscript) -> cst.BaseExpression:
         if any(q.name == "os.environ" for q in self._qn(original_node.value)) and len(original_node.slice) == 1:
@@ -418,11 +366,6 @@ class _V5(cst.CSTTransformer):
         value = _str_value(node)
         if value in R.REMOVED_ENV_VARS:
             self._find("TV5M08", node, name=value)
-
-    def leave_DictElement(self, original_node: cst.DictElement, updated_node: cst.DictElement) -> cst.DictElement:
-        if self.facts.has_import and _str_value(original_node.key) in R.OLD_ARGUMENT_NAMES:
-            self._find("TV5M12", original_node.key, name=_str_value(original_node.key))
-        return updated_node
 
 
 def _normalize(values: Iterable[str] | None) -> tuple[str, ...] | None:

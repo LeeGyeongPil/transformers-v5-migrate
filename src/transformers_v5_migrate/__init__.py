@@ -8,7 +8,7 @@ Public API::
     print(result.findings)    # things a human must look at
 """
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 from .codemod import migrate_source  # noqa: E402
 from .model import FileDiff, Finding, Fix, ParseError, Report, Result  # noqa: E402

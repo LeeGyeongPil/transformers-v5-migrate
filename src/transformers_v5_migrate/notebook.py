@@ -23,7 +23,6 @@ import libcst as cst
 from . import rules as R
 from .codemod import analyze_module
 from .model import Finding, ParseError, Result
-from .textscan import scan_text
 
 _LINES = re.compile(r"[^\n]*\n|[^\n]+")
 _MAGIC_ASSIGN = re.compile(r"^[\w.\[\]]+\s*=\s*[!%]")
@@ -131,14 +130,8 @@ def migrate_notebook(
         if not text.strip():
             continue
         if text.lstrip().startswith("%%"):  # cell magic (%%bash, %%writefile, ...): not Python
-            findings += scan_text(text, path, sel, ign, cell=idx)
             continue
-        masked, originals, magic_lines = _mask(text)
-        for number, body in magic_lines:
-            findings += [
-                dataclasses.replace(f, line=number)
-                for f in scan_text(body, path, sel, ign, cell=idx, skip_comments=False)
-            ]
+        masked, originals, _ = _mask(text)
         try:
             cst.parse_module(masked)
         except cst.ParserSyntaxError as exc:

@@ -12,10 +12,6 @@ DEFAULT_EXCLUDES = (
     "build", "dist", ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".ipynb_checkpoints", "*.egg-info",
 )
 
-_TEXT_PATTERNS = ("Dockerfile*", "*.Dockerfile", ".env", ".env.*", "*.sh", "*.bash", "Makefile")
-_YAML_PATTERNS = ("*.yml", "*.yaml")
-_NOT_CONFIG_JSON = ("package.json", "package-lock.json", "composer.json", "tsconfig*.json", "*.schema.json")
-
 
 class PathError(Exception):
     """A path given on the command line does not exist."""
@@ -28,8 +24,8 @@ class PathError(Exception):
 def classify(name: str) -> str | None:
     """Return the file kind, or None when the file is not a target.
 
-    Kinds: ``py``, ``ipynb``, ``requirements``, ``pyproject``, ``environment`` (conda),
-    ``yaml``, ``config`` (JSON training config) and ``text`` (Dockerfile, .env, shell, Makefile).
+    Kinds: ``py``, ``ipynb``, ``requirements`` (``requirements*.txt``, ``constraints*.txt``)
+    and ``pyproject``.
     """
     if name.endswith(".py"):
         return "py"
@@ -39,14 +35,6 @@ def classify(name: str) -> str | None:
         return "pyproject"
     if fnmatch.fnmatch(name, "requirements*.txt") or fnmatch.fnmatch(name, "constraints*.txt"):
         return "requirements"
-    if fnmatch.fnmatch(name, "environment*.yml") or fnmatch.fnmatch(name, "environment*.yaml"):
-        return "environment"
-    if any(fnmatch.fnmatch(name, pattern) for pattern in _YAML_PATTERNS):
-        return "yaml"
-    if name.endswith(".json") and not any(fnmatch.fnmatch(name, pattern) for pattern in _NOT_CONFIG_JSON):
-        return "config"
-    if any(fnmatch.fnmatch(name, pattern) for pattern in _TEXT_PATTERNS):
-        return "text"
     return None
 
 
