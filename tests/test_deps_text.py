@@ -12,12 +12,11 @@ def _rules(findings):
 
 
 def test_dependency_pins(example_project):
-    report = scan_paths([str(example_project / "requirements.txt"), str(example_project / "pyproject.toml")])
+    report = scan_paths([str(example_project / "constraints.txt"), str(example_project / "pyproject.toml")])
     by_file = {(f.path.rsplit("/", 1)[-1], f.rule, f.line) for f in report.findings}
     assert by_file == {
-        ("requirements.txt", "TV5D01", 2),
-        ("requirements.txt", "TV5D02", 3),
-        ("pyproject.toml", "TV5D01", 6),
+        ("constraints.txt", "TV5D01", 2),
+        ("constraints.txt", "TV5D02", 3),
     }
     assert all(f.kind == "dependency" for f in report.findings)
 
@@ -131,3 +130,15 @@ def test_text_files_never_written(tmp_path):
     for name, text in files.items():
         assert (tmp_path / name).read_text() == text
     assert len(report.findings) >= len(files)
+
+
+def test_sample_project_references_existing_files(example_project):
+    """Regression: files named in the sample Dockerfile must exist (the requirements.txt rename broke it)."""
+    import re
+
+    dockerfile = (example_project / "Dockerfile").read_text()
+    names = re.findall(r"^(?:COPY\s+(\S+)\s+\.|RUN\s+pip install -r\s+(\S+))", dockerfile, re.M)
+    referenced = {n for pair in names for n in pair if n and n != "."}
+    assert "constraints.txt" in referenced
+    for name in referenced:
+        assert (example_project / name).is_file(), f"Dockerfile references missing {name}"
